@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Susan 单词打卡闯关</title>
+<style>
+  :root{
+    --pink:#ff6b9d; --pink-light:#ffe3ee; --blue:#4dabf7; --blue-light:#e3f2ff;
+    --yellow:#ffd43b; --green:#51cf66; --purple:#9775fa;
+    --bg:#fff7fb; --card:#ffffff; --text:#3b3b4f; --muted:#8a8a9e;
+    --shadow:0 6px 18px rgba(255,107,157,.15);
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .app{max-width:520px; margin:0 auto; padding:16px 16px 90px;}
+  /* ---------- 顶部 ---------- */
+  header{
+    background:linear-gradient(135deg,var(--pink),#ff8fab 60%,var(--purple));
+    border-radius:20px; padding:20px 18px; color:#fff; box-shadow:var(--shadow);
+    position:relative; overflow:hidden;
+  }
+  header::after{content:"❄️"; position:absolute; right:14px; top:12px; font-size:28px; opacity:.5;}
+  .hi{font-size:13px; opacity:.9;}
+  .streak{font-size:30px; font-weight:800; margin-top:4px;}
+  .streak small{font-size:14px; font-weight:500; opacity:.9;}
+  .today-bar{margin-top:12px; background:rgba(255,255,255,.25); border-radius:12px; padding:8px 10px; font-size:13px;}
+  .bar-track{background:rgba(255,255,255,.35); height:8px; border-radius:6px; margin-top:6px; overflow:hidden;}
+  .bar-fill{height:100%; background:#fff; border-radius:6px; transition:width .4s;}
+  /* ---------- 日历打卡 ---------- */
+  .card{background:var(--card); border-radius:18px; padding:16px; margin-top:14px; box-shadow:var(--shadow);}
+  .card h2{font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:6px;}
+  .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
+  .cal .d{
+    aspect-ratio:1; border-radius:10px; background:#f4f4f8; display:flex; align-items:center;
+    justify-content:center; font-size:12px; color:var(--muted); position:relative;
+  }
+  .cal .d.done{background:var(--pink); color:#fff; font-weight:700;}
+  .cal .d.today{outline:2px solid var(--blue); outline-offset:1px;}
+  .cal .d.future{opacity:.45;}
+  .cal .wd{font-size:10px; color:var(--muted); text-align:center; padding-bottom:2px;}
+  /* ---------- 模式选择 ---------- */
+  .modes{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;}
+  .mode{
+    border:none; border-radius:18px; padding:16px 12px; cursor:pointer; color:#fff;
+    font-size:15px; font-weight:700; text-align:left; box-shadow:var(--shadow);
+    transition:transform .15s; font-family:inherit;
+  }
+  .mode:active{transform:scale(.96);}
+  .mode p{font-size:11px; font-weight:400; opacity:.9; margin-top:4px;}
+  .m1{background:linear-gradient(135deg,#4dabf7,#74c0fc);}
+  .m2{background:linear-gradient(135deg,#51cf66,#8ce99a);}
+  .m3{background:linear-gradient(135deg,#9775fa,#b197fc);}
+  .m4{background:linear-gradient(135deg,#ffa94d,#ffc078);}
+  .m5{background:linear-gradient(135deg,#f59f00,#ffd43b); grid-column:1/-1;}
+  /* ---------- 练习界面 ---------- */
+  .screen{display:none;}
+  .screen.active{display:block;}
+  .quiz-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .btn-back{
+    border:none; background:#f4f4f8; border-radius:10px; padding:7px 12px; cursor:pointer;
+    font-size:13px; color:var(--muted); font-family:inherit;
+  }
+  .progress-dots{display:flex; gap:5px;}
+  .dot{width:10px; height:10px; border-radius:50%; background:#eee;}
+  .dot.ok{background:var(--green);} .dot.bad{background:#ff8787;}
+  .question-card{
+    background:var(--card); border-radius:20px; padding:26px 16px; text-align:center;
+    box-shadow:var(--shadow); margin-bottom:14px;
+  }
+  .q-label{font-size:12px; color:var(--muted); margin-bottom:8px;}
+  .q-word{font-size:34px; font-weight:800; letter-spacing:.5px;}
+  .q-pho{font-size:14px; color:var(--muted); margin-top:6px;}
+  .speak-btn{
+    margin-top:12px; border:none; background:var(--blue-light); color:var(--blue);
+    border-radius:50px; padding:9px 18px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .sentence{font-size:14px; color:var(--text); background:#f8f9fb; border-radius:12px; padding:10px 12px; margin-top:14px; line-height:1.6;}
+  .sentence b{color:var(--pink);}
+  .options{display:grid; gap:10px;}
+  .opt{
+    border:2px solid #eee; background:var(--card); border-radius:14px; padding:14px;
+    font-size:16px; cursor:pointer; text-align:center; font-family:inherit; color:var(--text);
+    transition:border-color .15s, background .15s;
+  }
+  .opt.correct{border-color:var(--green); background:#ebfbf0; color:#2b8a3e; font-weight:700;}
+  .opt.wrong{border-color:#ff8787; background:#fff0f0; color:#e03131;}
+  .opt:disabled{cursor:default;}
+  /* 拼写 */
+  .spell-input{
+    width:100%; font-size:22px; text-align:center; padding:12px; border-radius:14px;
+    border:2px solid #eee; font-family:inherit; letter-spacing:2px; outline:none;
+  }
+  .spell-input:focus{border-color:var(--blue);}
+  .btn-main{
+    width:100%; border:none; border-radius:14px; padding:14px; font-size:16px; font-weight:700;
+    background:var(--pink); color:#fff; cursor:pointer; margin-top:12px; font-family:inherit;
+  }
+  /* ---------- 反馈弹层 ---------- */
+  .feedback{
+    position:fixed; left:0; right:0; bottom:-90px; margin:0 auto; max-width:480px;
+    background:var(--card); border-radius:20px 20px 0 0; padding:18px; text-align:center;
+    box-shadow:0 -8px 30px rgba(0,0,0,.12); transition:bottom .3s; z-index:50;
+  }
+  .feedback.show{bottom:0;}
+  .fb-title{font-size:22px; font-weight:800;}
+  .fb-title.good{color:var(--green);} .fb-title.bad{color:#ff8787;}
+  .fb-detail{font-size:14px; color:var(--muted); margin-top:6px; line-height:1.6;}
+  .stars{font-size:26px; margin-top:4px;}
+  /* ---------- 结算 ---------- */
+  .result-emoji{font-size:56px; text-align:center;}
+  .result-num{text-align:center; font-size:40px; font-weight:800; margin-top:8px;}
+  .result-sub{text-align:center; color:var(--muted); font-size:14px; margin-top:6px;}
+  .toast{
+    position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-80px);
+    background:var(--text); color:#fff; padding:10px 20px; border-radius:50px; font-size:14px;
+    transition:transform .3s; z-index:60;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  /* ---------- 词卡切换 ---------- */
+  .deck-btn{
+    flex:1; border:2px solid #eee; background:#fff; border-radius:14px; padding:12px;
+    font-size:15px; font-weight:700; cursor:pointer; color:var(--muted); font-family:inherit;
+    transition:all .15s;
+  }
+  .deck-btn.on{border-color:var(--pink); background:var(--pink-light); color:var(--pink);}
+  /* ---------- 家长词库 ---------- */
+  .sm-input{
+    flex:1; min-width:0; border:2px solid #eee; border-radius:10px; padding:9px 12px;
+    font-size:14px; font-family:inherit; outline:none; color:var(--text);
+  }
+  .sm-input:focus{border-color:var(--blue);}
+  .btn-mini{
+    border:none; background:var(--pink); color:#fff; border-radius:10px; padding:9px 16px;
+    font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .btn-mini.ghost{background:#f4f4f8; color:var(--muted);}
+  .btn-mini:active{transform:scale(.96);}
+  .cw-tag{
+    display:inline-flex; align-items:center; gap:5px; background:#fff; border:2px solid #ffe3ee;
+    border-radius:10px; padding:5px 10px; font-size:13px; font-family:inherit; color:var(--text);
+  }
+  .cw-tag button{
+    border:none; background:none; color:#ff8787; cursor:pointer; font-size:14px;
+    padding:0 2px; font-family:inherit; line-height:1;
+  }
+  .rng-btn{
+    border:2px solid #eee; background:#fff; border-radius:50px; padding:7px 14px;
+    font-size:13px; cursor:pointer; color:var(--muted); font-family:inherit; font-weight:600;
+  }
+  .rng-btn.on{border-color:var(--blue); background:var(--blue-light); color:var(--blue);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ====== 首页 ====== -->
+  <div class="screen active" id="home">
+    <header>
+      <div class="hi">❄️ 今天也要开口说英语！</div>
+      <div class="streak"><span id="streakNum">0</span><small> 天连续打卡</small></div>
+      <div class="today-bar">
+        <span id="todayTask">今日目标：完成 8 题打卡</span>
+        <div class="bar-track"><div class="bar-fill" id="todayBar" style="width:0%"></div></div>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>📅 打卡日历 <span style="font-size:12px;color:var(--muted)" id="monthLabel"></span></h2>
+      <div class="cal" id="calendar"></div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center">
+        ⭐ 总星星：<b id="totalStars">0</b>　🏆 通关次数：<b id="totalRuns">0</b>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🃏 词卡选择 <span style="font-size:12px;color:var(--muted)">点右上角切换</span></h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="deckSusan" class="deck-btn" onclick="switchDeck('susan')">🥇 第一桶金</button>
+        <button id="deckNoun" class="deck-btn" onclick="switchDeck('noun')">⭐ 名词卡</button>
+        <button id="deckPhrase" class="deck-btn" onclick="switchDeck('phrase')">💬 场景表达卡</button>
+        <button id="deckCustom" class="deck-btn" onclick="switchDeck('custom')">📌 我的词卡</button>
+      </div>
+      <div id="rangeRow" style="display:none;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="rng-btn" onclick="setRange('all')">全部100词</button>
+        <button class="rng-btn" onclick="setRange('1-25')">1-25词</button>
+        <button class="rng-btn" onclick="setRange('26-50')">26-50词</button>
+        <button class="rng-btn" onclick="setRange('51-75')">51-75词</button>
+        <button class="rng-btn" onclick="setRange('76-100')">76-100词</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✏️ 家长添加单词 <span style="font-size:12px;color:var(--muted)">跟上老师进度，自定义打卡</span></h2>
+      <div style="display:flex;gap:8px">
+        <input id="cwWord" class="sm-input" placeholder="英文单词，如 apple">
+        <input id="cwCn" class="sm-input" placeholder="中文意思，如 苹果">
+      </div>
+      <input id="cwS" class="sm-input" style="width:100%;margin-top:8px" placeholder="例句（选填，句子里包含这个单词，如：I eat an apple.）">
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button class="btn-mini" onclick="addCustom()">➕ 添加</button>
+        <button class="btn-mini ghost" onclick="toggleImport()">📋 批量导入</button>
+        <span style="font-size:12px;color:var(--muted)" id="customCount"></span>
+      </div>
+      <textarea id="cwBatch" class="sm-input" style="display:none;width:100%;margin-top:8px;height:84px;resize:vertical"
+        placeholder="每行一个词，用 | 分隔：&#10;apple | 苹果 | I eat an apple.&#10;orange | 橙子"></textarea>
+      <button id="cwImportBtn" class="btn-mini" style="display:none;margin-top:8px" onclick="importBatch()">导入以上单词</button>
+      <div id="customList" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+
+    <div class="card">
+      <h2>💾 进度存档 <span style="font-size:12px;color:var(--muted)">换设备/换浏览器时迁移打卡数据</span></h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn-mini ghost" onclick="exportSave()">📤 导出存档码</button>
+        <button class="btn-mini ghost" onclick="toggleSaveBox()">📥 导入存档码</button>
+      </div>
+      <textarea id="saveBox" class="sm-input" style="display:none;width:100%;margin-top:8px;height:72px;resize:vertical;font-size:12px" placeholder="存档码粘贴在这里"></textarea>
+      <button id="saveImportBtn" class="btn-mini" style="display:none;margin-top:8px" onclick="importSave()">恢复以上存档</button>
+    </div>
+
+    <div class="modes">
+      <button class="mode m1" onclick="startQuiz('recognize')">👀 认词挑战<p>看单词，选意思（8题）</p></button>
+      <button class="mode m2" onclick="startQuiz('listen')">👂 听音辨词<p>听发音，选单词（8题）</p></button>
+      <button class="mode m3" onclick="startQuiz('spell')">✏️ 拼写闯关<p>听意思，拼单词（6题）</p></button>
+      <button class="mode m4" onclick="startQuiz('sentence')">💬 场景造句<p>选词补全Susan句型（6题）</p></button>
+      <button class="mode m5" onclick="startQuiz('picture')">🖼️ 看图选词<p>看图片，选对单词（8题）</p></button>
+    </div>
+
+    <div class="card">
+      <h2>📚 <span id="bankLabel">⭐ 超级名词卡</span> <span style="font-size:12px;color:var(--muted)">点卡片听发音</span></h2>
+      <div id="wordBank" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+  </div>
+
+  <!-- ====== 练习页 ====== -->
+  <div class="screen" id="quiz">
+    <div class="quiz-head">
+      <button class="btn-back" onclick="quitQuiz()">← 退出</button>
+      <div class="progress-dots" id="dots"></div>
+    </div>
+    <div class="question-card" id="qCard"></div>
+    <div class="options" id="optArea"></div>
+    <div id="spellArea" style="display:none">
+      <input class="spell-input" id="spellInput" placeholder="在这里拼出单词" autocomplete="off" autocapitalize="off">
+      <button class="btn-main" onclick="checkSpell()">提交 ✓</button>
+    </div>
+  </div>
+
+  <!-- ====== 结算页 ====== -->
+  <div class="screen" id="result">
+    <div class="card" style="margin-top:30px">
+      <div class="result-emoji" id="resEmoji">🎉</div>
+      <div class="result-num" id="resScore">8/8</div>
+      <div class="result-sub" id="resSub">满分！Susan 会为你骄傲的</div>
+      <div style="text-align:center;font-size:22px;margin:10px 0" id="resStars">⭐⭐⭐</div>
+      <button class="btn-main" onclick="goHome()">回到主页</button>
+    </div>
+  </div>
+</div>
+
+<div class="feedback" id="fb">
+  <div class="fb-title" id="fbTitle">答对啦！</div>
+  <div class="stars" id="fbStars">⭐ +1</div>
+  <div class="fb-detail" id="fbDetail"></div>
+  <button class="btn-main" onclick="nextQuestion()">继续 →</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 词库0：第一桶金 Susan超级名词卡1-100（原目录顺序） ================= */
+const SUSAN_BANK = [
+  {n:1, w:"chick", pho:"/tʃɪk/", cn:"小鸡", s:"The chick says peep peep!", tag:"动物"},
+  {n:2, w:"duck", pho:"/dʌk/", cn:"鸭子", s:"The duck is swimming in the pond.", tag:"动物"},
+  {n:3, w:"lion", pho:"/ˈlaɪən/", cn:"狮子", s:"The lion roars loudly.", tag:"动物"},
+  {n:4, w:"tiger", pho:"/ˈtaɪɡə/", cn:"老虎", s:"The tiger has stripes.", tag:"动物"},
+  {n:5, w:"monkey", pho:"/ˈmʌŋki/", cn:"猴子", s:"The monkey loves bananas.", tag:"动物"},
+  {n:6, w:"panda", pho:"/ˈpændə/", cn:"熊猫", s:"The panda eats bamboo all day.", tag:"动物"},
+  {n:7, w:"pig", pho:"/pɪɡ/", cn:"猪", s:"It is an animal. It says oink oink!", tag:"动物"},
+  {n:8, w:"elephant", pho:"/ˈelɪfənt/", cn:"大象", s:"The elephant has a long trunk.", tag:"动物"},
+  {n:9, w:"sheep", pho:"/ʃiːp/", cn:"绵羊", s:"The sheep says baa baa.", tag:"动物"},
+  {n:10, w:"rabbit", pho:"/ˈræbɪt/", cn:"兔子", s:"The rabbit hops very fast.", tag:"动物"},
+  {n:11, w:"dog", pho:"/dɒɡ/", cn:"狗", s:"My dog likes to play fetch.", tag:"动物"},
+  {n:12, w:"deer", pho:"/dɪə/", cn:"鹿", s:"The deer runs in the forest.", tag:"动物"},
+  {n:13, w:"cat", pho:"/kæt/", cn:"猫", s:"The cat says meow meow.", tag:"动物"},
+  {n:14, w:"fox", pho:"/fɒks/", cn:"狐狸", s:"The fox has a big fluffy tail.", tag:"动物"},
+  {n:15, w:"penguin", pho:"/ˈpeŋɡwɪn/", cn:"企鹅", s:"The penguin walks side to side.", tag:"动物"},
+  {n:16, w:"hen", pho:"/hen/", cn:"母鸡", s:"The hen lays eggs every day.", tag:"动物"},
+  {n:17, w:"horse", pho:"/hɔːs/", cn:"马", s:"The horse runs very fast.", tag:"动物"},
+  {n:18, w:"donkey", pho:"/ˈdɒŋki/", cn:"驴", s:"The donkey says hee-haw!", tag:"动物"},
+  {n:19, w:"bull", pho:"/bʊl/", cn:"公牛", s:"The bull is big and strong.", tag:"动物"},
+  {n:20, w:"gorilla", pho:"/ɡəˈrɪlə/", cn:"大猩猩", s:"The gorilla beats its chest.", tag:"动物"},
+  {n:21, w:"owl", pho:"/aʊl/", cn:"猫头鹰", s:"The owl sleeps in the day.", tag:"动物"},
+  {n:22, w:"cow", pho:"/kaʊ/", cn:"奶牛", s:"The cow gives us milk.", tag:"动物"},
+  {n:23, w:"apple", pho:"/ˈæpl/", cn:"苹果", s:"An apple a day keeps the doctor away.", tag:"水果"},
+  {n:24, w:"orange", pho:"/ˈɒrɪndʒ/", cn:"橙子", s:"The orange is sweet and juicy.", tag:"水果"},
+  {n:25, w:"watermelon", pho:"/ˈwɔːtəmelən/", cn:"西瓜", s:"Watermelon is perfect in summer.", tag:"水果"},
+  {n:26, w:"grape", pho:"/ɡreɪp/", cn:"葡萄", s:"Grapes grow in bunches.", tag:"水果"},
+  {n:27, w:"banana", pho:"/bəˈnɑːnə/", cn:"香蕉", s:"Peel the banana before you eat it.", tag:"水果"},
+  {n:28, w:"pear", pho:"/peə/", cn:"梨", s:"The pear is soft and sweet.", tag:"水果"},
+  {n:29, w:"coconut", pho:"/ˈkəʊkənʌt/", cn:"椰子", s:"Coconut milk is yummy.", tag:"水果"},
+  {n:30, w:"vegetable", pho:"/ˈvedʒtəbl/", cn:"蔬菜", s:"Eat vegetables to grow strong.", tag:"食物"},
+  {n:31, w:"carrot", pho:"/ˈkærət/", cn:"胡萝卜", s:"Rabbits love carrots.", tag:"食物"},
+  {n:32, w:"tomato", pho:"/təˈmɑːtəʊ/", cn:"西红柿", s:"The tomato is red and round.", tag:"食物"},
+  {n:33, w:"pea", pho:"/piː/", cn:"豌豆", s:"Little peas live in a green pod.", tag:"食物"},
+  {n:34, w:"potato", pho:"/pəˈteɪtəʊ/", cn:"土豆", s:"French fries come from potatoes.", tag:"食物"},
+  {n:35, w:"fish", pho:"/fɪʃ/", cn:"鱼", s:"The fish swims in the tank.", tag:"食物"},
+  {n:36, w:"egg", pho:"/eɡ/", cn:"鸡蛋", s:"I eat an egg every morning.", tag:"食物"},
+  {n:37, w:"hamburger", pho:"/ˈhæmbɜːɡə/", cn:"汉堡包", s:"The hamburger looks delicious.", tag:"食物"},
+  {n:38, w:"noodles", pho:"/ˈnuːdlz/", cn:"面条", s:"Slurping noodles is fun!", tag:"食物"},
+  {n:39, w:"candy", pho:"/ˈkændi/", cn:"糖果", s:"Too much candy is bad for teeth.", tag:"食物"},
+  {n:40, w:"juice", pho:"/dʒuːs/", cn:"果汁", s:"A glass of orange juice, please.", tag:"食物"},
+  {n:41, w:"mom", pho:"/mɒm/", cn:"妈妈", s:"I love my mom so much.", tag:"人物"},
+  {n:42, w:"dad", pho:"/dæd/", cn:"爸爸", s:"Dad reads me a story at night.", tag:"人物"},
+  {n:43, w:"grandma", pho:"/ˈɡrænmɑː/", cn:"奶奶/外婆", s:"Grandma makes the best dumplings.", tag:"人物"},
+  {n:44, w:"grandpa", pho:"/ˈɡrænpɑː/", cn:"爷爷/外公", s:"Grandpa takes me to the park.", tag:"人物"},
+  {n:45, w:"girl", pho:"/ɡɜːl/", cn:"女孩", s:"The girl is singing a song.", tag:"人物"},
+  {n:46, w:"boy", pho:"/bɔɪ/", cn:"男孩", s:"The boy is riding a bike.", tag:"人物"},
+  {n:47, w:"baby", pho:"/ˈbeɪbi/", cn:"婴儿", s:"The baby is sleeping quietly.", tag:"人物"},
+  {n:48, w:"robot", pho:"/ˈrəʊbɒt/", cn:"机器人", s:"The robot can dance and talk.", tag:"人物"},
+  {n:49, w:"heart", pho:"/hɑːt/", cn:"心脏", s:"My heart goes boom boom.", tag:"身体"},
+  {n:50, w:"mouth", pho:"/maʊθ/", cn:"嘴巴", s:"Open your mouth and say ah.", tag:"身体"},
+  {n:51, w:"hand", pho:"/hænd/", cn:"手", s:"Wash your hands before dinner.", tag:"身体"},
+  {n:52, w:"foot", pho:"/fʊt/", cn:"脚", s:"My foot has five toes.", tag:"身体"},
+  {n:53, w:"leg", pho:"/leɡ/", cn:"腿", s:"I run with my two legs.", tag:"身体"},
+  {n:54, w:"arm", pho:"/ɑːm/", cn:"手臂", s:"Raise your arm high!", tag:"身体"},
+  {n:55, w:"building", pho:"/ˈbɪldɪŋ/", cn:"楼房", s:"That building is very tall.", tag:"家居"},
+  {n:56, w:"bed", pho:"/bed/", cn:"床", s:"Go to bed early tonight.", tag:"家居"},
+  {n:57, w:"desk", pho:"/desk/", cn:"书桌", s:"My desk is next to the window.", tag:"家居"},
+  {n:58, w:"table", pho:"/ˈteɪbl/", cn:"桌子", s:"The whole family sits at the table.", tag:"家居"},
+  {n:59, w:"door", pho:"/dɔː/", cn:"门", s:"Please close the door.", tag:"家居"},
+  {n:60, w:"window", pho:"/ˈwɪndəʊ/", cn:"窗户", s:"Look out of the window. It's raining!", tag:"家居"},
+  {n:61, w:"sofa", pho:"/ˈsəʊfə/", cn:"沙发", s:"Dad is napping on the sofa.", tag:"家居"},
+  {n:62, w:"piano", pho:"/piˈænəʊ/", cn:"钢琴", s:"She plays the piano every day.", tag:"家居"},
+  {n:63, w:"TV", pho:"/ˌtiːˈviː/", cn:"电视", s:"No TV before homework is done.", tag:"家居"},
+  {n:64, w:"freezer", pho:"/ˈfriːzə/", cn:"冰柜/冰箱", s:"The ice cream is in the freezer.", tag:"物品"},
+  {n:65, w:"newspaper", pho:"/ˈnjuːzpeɪpə/", cn:"报纸", s:"Grandpa reads the newspaper at breakfast.", tag:"物品"},
+  {n:66, w:"envelope", pho:"/ˈenvələʊp/", cn:"信封", s:"Put the letter in the envelope.", tag:"物品"},
+  {n:67, w:"pencil", pho:"/ˈpensl/", cn:"铅笔", s:"My pencil is very sharp.", tag:"物品"},
+  {n:68, w:"book", pho:"/bʊk/", cn:"书", s:"This book is full of stories.", tag:"物品"},
+  {n:69, w:"ink", pho:"/ɪŋk/", cn:"墨水", s:"The pen needs more ink.", tag:"物品"},
+  {n:70, w:"cup", pho:"/kʌp/", cn:"杯子", s:"Here is a cup of warm milk.", tag:"物品"},
+  {n:71, w:"lock", pho:"/lɒk/", cn:"锁", s:"The lock keeps the door safe.", tag:"物品"},
+  {n:72, w:"key", pho:"/kiː/", cn:"钥匙", s:"I can't find my key!", tag:"物品"},
+  {n:73, w:"hammer", pho:"/ˈhæmə/", cn:"锤子", s:"Dad fixes the chair with a hammer.", tag:"物品"},
+  {n:74, w:"clock", pho:"/klɒk/", cn:"钟", s:"The clock says it's seven o'clock.", tag:"物品"},
+  {n:75, w:"jacket", pho:"/ˈdʒækɪt/", cn:"夹克", s:"Put on your jacket. It's cold.", tag:"衣物"},
+  {n:76, w:"jeans", pho:"/dʒiːnz/", cn:"牛仔裤", s:"My jeans have two pockets.", tag:"衣物"},
+  {n:77, w:"dress", pho:"/dres/", cn:"连衣裙", s:"She wears a pretty red dress.", tag:"衣物"},
+  {n:78, w:"vest", pho:"/vest/", cn:"背心", s:"A vest keeps your body warm.", tag:"衣物"},
+  {n:79, w:"T-shirt", pho:"/ˈtiːʃɜːt/", cn:"T恤", s:"I love my blue T-shirt.", tag:"衣物"},
+  {n:80, w:"sock", pho:"/sɒk/", cn:"袜子", s:"Where is my other sock?", tag:"衣物"},
+  {n:81, w:"hat", pho:"/hæt/", cn:"帽子", s:"Wear a hat in the sunshine.", tag:"衣物"},
+  {n:82, w:"cap", pho:"/kæp/", cn:"棒球帽", s:"The cap has a long bill.", tag:"衣物"},
+  {n:83, w:"glasses", pho:"/ˈɡlɑːsɪz/", cn:"眼镜", s:"Grandma reads with her glasses on.", tag:"衣物"},
+  {n:84, w:"sunglasses", pho:"/ˈsʌnɡlɑːsɪz/", cn:"太阳镜", s:"Sunglasses protect your eyes.", tag:"衣物"},
+  {n:85, w:"watch", pho:"/wɒtʃ/", cn:"手表", s:"My watch tells me the time.", tag:"衣物"},
+  {n:86, w:"umbrella", pho:"/ʌmˈbrelə/", cn:"雨伞", s:"Take an umbrella. It might rain.", tag:"衣物"},
+  {n:87, w:"car", pho:"/kɑː/", cn:"小汽车", s:"Our car is parked over there.", tag:"交通"},
+  {n:88, w:"bus", pho:"/bʌs/", cn:"公交车", s:"We take the bus to school.", tag:"交通"},
+  {n:89, w:"van", pho:"/væn/", cn:"面包车", s:"The van carries many boxes.", tag:"交通"},
+  {n:90, w:"traffic light", pho:"/ˈtræfɪk laɪt/", cn:"红绿灯", s:"Stop when the traffic light is red.", tag:"交通"},
+  {n:91, w:"boat", pho:"/bəʊt/", cn:"小船", s:"The boat floats on the sea.", tag:"自然"},
+  {n:92, w:"sea", pho:"/siː/", cn:"大海", s:"The sea is big and blue.", tag:"自然"},
+  {n:93, w:"sun", pho:"/sʌn/", cn:"太阳", s:"The sun rises in the morning.", tag:"自然"},
+  {n:94, w:"moon", pho:"/muːn/", cn:"月亮", s:"The moon is bright tonight.", tag:"自然"},
+  {n:95, w:"flower", pho:"/ˈflaʊə/", cn:"花", s:"Smell the flower. It's sweet.", tag:"自然"},
+  {n:96, w:"grass", pho:"/ɡrɑːs/", cn:"草", s:"We sit on the soft grass.", tag:"自然"},
+  {n:97, w:"spring", pho:"/sprɪŋ/", cn:"春天", s:"Flowers come out in spring.", tag:"自然"},
+  {n:98, w:"summer", pho:"/ˈsʌmə/", cn:"夏天", s:"We swim a lot in summer.", tag:"自然"},
+  {n:99, w:"autumn", pho:"/ˈɔːtəm/", cn:"秋天", s:"Leaves fall down in autumn.", tag:"自然"},
+  {n:100, w:"winter", pho:"/ˈwɪntə/", cn:"冬天", s:"It snows in winter.", tag:"自然"},
+];
+
+/* ================= 词库1：超级名词卡（配图练习版） ================= */
+const NOUN_BANK = [
+  // —— 动物 ——
+  {w:"elephant", pho:"/ˈelɪfənt/", cn:"大象", s:"The elephant has a long trunk.", tag:"动物"},
+  {w:"penguin", pho:"/ˈpeŋɡwɪn/", cn:"企鹅", s:"Penguins live in cold places.", tag:"动物"},
+  {w:"squirrel", pho:"/ˈskwɜːrəl/", cn:"松鼠", s:"The squirrel is hiding nuts.", tag:"动物"},
+  {w:"dolphin", pho:"/ˈdɒlfɪn/", cn:"海豚", s:"Dolphins are super smart.", tag:"动物"},
+  {w:"butterfly", pho:"/ˈbʌtəflaɪ/", cn:"蝴蝶", s:"A butterfly landed on the flower.", tag:"动物"},
+  {w:"rabbit", pho:"/ˈræbɪt/", cn:"兔子", s:"The rabbit eats carrots every day.", tag:"动物"},
+  {w:"lion", pho:"/ˈlaɪən/", cn:"狮子", s:"The lion is the king of animals.", tag:"动物"},
+  {w:"giraffe", pho:"/dʒəˈrɑːf/", cn:"长颈鹿", s:"A giraffe has a very long neck.", tag:"动物"},
+  // —— 食物 ——
+  {w:"cookie", pho:"/ˈkʊki/", cn:"曲奇饼干", s:"I want a chocolate cookie.", tag:"食物"},
+  {w:"noodles", pho:"/ˈnuːdlz/", cn:"面条", s:"Slurping noodles is fun!", tag:"食物"},
+  {w:"dumplings", pho:"/ˈdʌmplɪŋz/", cn:"饺子", s:"We make dumplings together.", tag:"食物"},
+  {w:"yogurt", pho:"/ˈjəʊɡət/", cn:"酸奶", s:"A cup of yogurt after dinner.", tag:"食物"},
+  {w:"strawberry", pho:"/ˈstrɔːbəri/", cn:"草莓", s:"Strawberries are sweet and red.", tag:"食物"},
+  {w:"sandwich", pho:"/ˈsænwɪdʒ/", cn:"三明治", s:"Mom made me a big sandwich.", tag:"食物"},
+  {w:"egg", pho:"/eɡ/", cn:"鸡蛋", s:"I eat an egg every morning.", tag:"食物"},
+  {w:"milk", pho:"/mɪlk/", cn:"牛奶", s:"Drink your milk, please.", tag:"食物"},
+  // —— 学校 ——
+  {w:"pencil", pho:"/ˈpensl/", cn:"铅笔", s:"My pencil is very sharp.", tag:"学校"},
+  {w:"eraser", pho:"/ɪˈreɪzə/", cn:"橡皮", s:"Can I borrow your eraser?", tag:"学校"},
+  {w:"notebook", pho:"/ˈnəʊtbʊk/", cn:"笔记本", s:"Write it down in your notebook.", tag:"学校"},
+  {w:"classroom", pho:"/ˈklɑːsrʊm/", cn:"教室", s:"Our classroom is bright and clean.", tag:"学校"},
+  {w:"library", pho:"/ˈlaɪbrəri/", cn:"图书馆", s:"We read books in the library.", tag:"学校"},
+  {w:"scissors", pho:"/ˈsɪzəz/", cn:"剪刀", s:"Be careful with the scissors.", tag:"学校"},
+  // —— 身体 ——
+  {w:"elbow", pho:"/ˈelbəʊ/", cn:"手肘", s:"Don't bump your elbow on the table.", tag:"身体"},
+  {w:"shoulder", pho:"/ˈʃəʊldə/", cn:"肩膀", s:"The bag is heavy on my shoulder.", tag:"身体"},
+  {w:"stomach", pho:"/ˈstʌmək/", cn:"肚子/胃", s:"My stomach is growling!", tag:"身体"},
+  {w:"knee", pho:"/niː/", cn:"膝盖", s:"I scraped my knee at recess.", tag:"身体"},
+  {w:"chin", pho:"/tʃɪn/", cn:"下巴", s:"Keep your chin up!", tag:"身体"},
+  {w:"finger", pho:"/ˈfɪŋɡə/", cn:"手指", s:"There are five fingers on one hand.", tag:"身体"},
+  // —— 家居 ——
+  {w:"pillow", pho:"/ˈpɪləʊ/", cn:"枕头", s:"This pillow is soft and fluffy.", tag:"家居"},
+  {w:"curtain", pho:"/ˈkɜːtn/", cn:"窗帘", s:"Pull the curtain open, please.", tag:"家居"},
+  {w:"sofa", pho:"/ˈsəʊfə/", cn:"沙发", s:"Dad is napping on the sofa.", tag:"家居"},
+  {w:"mirror", pho:"/ˈmɪrə/", cn:"镜子", s:"Look at yourself in the mirror.", tag:"家居"},
+  {w:"refrigerator", pho:"/rɪˈfrɪdʒəreɪtə/", cn:"冰箱", s:"The milk is in the refrigerator.", tag:"家居"},
+  {w:"lamp", pho:"/læmp/", cn:"台灯", s:"Turn on the lamp before reading.", tag:"家居"},
+  // —— 交通 ——
+  {w:"subway", pho:"/ˈsʌbweɪ/", cn:"地铁", s:"We take the subway to school.", tag:"交通"},
+  {w:"helicopter", pho:"/ˈhelɪkɒptə/", cn:"直升机", s:"A helicopter is flying over us!", tag:"交通"},
+  {w:"scooter", pho:"/ˈskuːtə/", cn:"滑板车", s:"I ride my scooter in the park.", tag:"交通"},
+  {w:"truck", pho:"/trʌk/", cn:"卡车", s:"A big truck is on the road.", tag:"交通"},
+  {w:"airplane", pho:"/ˈeəpleɪn/", cn:"飞机", s:"The airplane flies to Harbin.", tag:"交通"},
+  // —— 衣物 ——
+  {w:"sweater", pho:"/ˈswetə/", cn:"毛衣", s:"Wear a warm sweater today.", tag:"衣物"},
+  {w:"scarf", pho:"/skɑːf/", cn:"围巾", s:"My scarf keeps my neck warm.", tag:"衣物"},
+  {w:"gloves", pho:"/ɡlʌvz/", cn:"手套", s:"Put on your gloves, it's freezing!", tag:"衣物"},
+  {w:"boots", pho:"/buːts/", cn:"靴子", s:"Snow boots are must-have in Harbin.", tag:"衣物"},
+  {w:"raincoat", pho:"/ˈreɪnkəʊt/", cn:"雨衣", s:"Take your raincoat, it might rain.", tag:"衣物"},
+  // —— 自然天气 ——
+  {w:"rainbow", pho:"/ˈreɪnbəʊ/", cn:"彩虹", s:"Look! A rainbow after the rain!", tag:"自然"},
+  {w:"thunder", pho:"/ˈθʌndə/", cn:"雷声", s:"I heard thunder last night.", tag:"自然"},
+  {w:"snowflake", pho:"/ˈsnəʊfleɪk/", cn:"雪花", s:"Each snowflake is different.", tag:"自然"},
+  {w:"sunshine", pho:"/ˈsʌnʃaɪn/", cn:"阳光", s:"We play outside in the sunshine.", tag:"自然"},
+  // —— 地点 ——
+  {w:"playground", pho:"/ˈpleɪɡraʊnd/", cn:"游乐场/操场", s:"The kids are at the playground.", tag:"地点"},
+  {w:"hospital", pho:"/ˈhɒspɪtl/", cn:"医院", s:"Grandpa went to the hospital.", tag:"地点"},
+  {w:"supermarket", pho:"/ˈsuːpəmɑːkɪt/", cn:"超市", s:"Let's get snacks at the supermarket.", tag:"地点"},
+  {w:"museum", pho:"/mjuˈziːəm/", cn:"博物馆", s:"We visited a science museum.", tag:"地点"},
+  {w:"beach", pho:"/biːtʃ/", cn:"海滩", s:"We built a sandcastle at the beach.", tag:"地点"},
+  // —— 日常小物 ——
+  {w:"umbrella", pho:"/ʌmˈbrelə/", cn:"雨伞", s:"Take an umbrella just in case.", tag:"物品"},
+  {w:"balloon", pho:"/bəˈluːn/", cn:"气球", s:"The balloon flew into the sky.", tag:"物品"},
+  {w:"toothbrush", pho:"/ˈtuːθbrʌʃ/", cn:"牙刷", s:"Change your toothbrush every three months.", tag:"物品"},
+];
+
+/* ================= 词库2：场景表达卡 ================= */
+const PHRASE_BANK = [
+  // —— 开场寒暄场景 ——
+  {w:"What's up", pho:"/wʌts ʌp/", cn:"最近怎么样？", s:"What's up, buddy? Long time no see!", tag:"寒暄"},
+  {w:"Awesome", pho:"/ˈɔːsəm/", cn:"太棒了", s:"Your English is awesome!", tag:"夸赞"},
+  {w:"No worries", pho:"/nəʊ ˈwʌriz/", cn:"没关系，别担心", s:"No worries, we can try again.", tag:"安慰"},
+  {w:"You got it", pho:"/jʊ ɡɒt ɪt/", cn:"你做到了 / 没问题", s:"You got it! Keep going!", tag:"鼓励"},
+  {w:"My bad", pho:"/maɪ bæd/", cn:"我的错", s:"My bad, I forgot my homework.", tag:"道歉"},
+  // —— 情绪感受 ——
+  {w:"excited", pho:"/ɪkˈsaɪtɪd/", cn:"兴奋的", s:"I'm so excited about the trip!", tag:"情绪"},
+  {w:"nervous", pho:"/ˈnɜːvəs/", cn:"紧张的", s:"Don't be nervous, just relax.", tag:"情绪"},
+  {w:"proud", pho:"/praʊd/", cn:"骄傲的", s:"I'm proud of you, kiddo!", tag:"情绪"},
+  {w:"exhausted", pho:"/ɪɡˈzɔːstɪd/", cn:"累坏了的", s:"After running, I was exhausted.", tag:"情绪"},
+  {w:"curious", pho:"/ˈkjʊəriəs/", cn:"好奇的", s:"Kids are curious about everything.", tag:"情绪"},
+  // —— 学校生活 ——
+  {w:"homework", pho:"/ˈhəʊmwɜːk/", cn:"作业", s:"I finished my homework already.", tag:"学校"},
+  {w:"backpack", pho:"/ˈbækpæk/", cn:"背包", s:"My backpack is super heavy.", tag:"学校"},
+  {w:"recess", pho:"/rɪˈses/", cn:"课间休息", s:"We play tag at recess.", tag:"学校"},
+  {w:"quiz", pho:"/kwɪz/", cn:"小测验", s:"We have a spelling quiz today.", tag:"学校"},
+  {w:"raise your hand", pho:"/reɪz jɔː hænd/", cn:"举手", s:"Raise your hand before you speak.", tag:"学校"},
+  // —— 一日三餐 ——
+  {w:"breakfast", pho:"/ˈbrekfəst/", cn:"早餐", s:"What's for breakfast, Mom?", tag:"食物"},
+  {w:"delicious", pho:"/dɪˈlɪʃəs/", cn:"美味的", s:"This soup is delicious!", tag:"食物"},
+  {w:"snack", pho:"/snæk/", cn:"零食", s:"An apple is a healthy snack.", tag:"食物"},
+  {w:"thirsty", pho:"/ˈθɜːsti/", cn:"口渴的", s:"I'm thirsty. Can I have some water?", tag:"食物"},
+  {w:"leftovers", pho:"/ˈleftəʊvəz/", cn:"剩饭剩菜", s:"We had leftovers for dinner.", tag:"食物"},
+  // —— 日常动作 ——
+  {w:"hurry up", pho:"/ˈhʌri ʌp/", cn:"快点", s:"Hurry up, we'll be late!", tag:"动作"},
+  {w:"brush your teeth", pho:"/brʌʃ jɔː tiːθ/", cn:"刷牙", s:"Brush your teeth before bed.", tag:"动作"},
+  {w:"clean up", pho:"/kliːn ʌp/", cn:"收拾干净", s:"Clean up your room, please.", tag:"动作"},
+  {w:"give up", pho:"/ɡɪv ʌp/", cn:"放弃", s:"Never give up, keep trying!", tag:"动作"},
+  {w:"work out", pho:"/wɜːk aʊt/", cn:"锻炼 / 解决", s:"Things will work out fine.", tag:"动作"},
+  // —— 外出游玩 ——
+  {w:"sightseeing", pho:"/ˈsaɪtsiːɪŋ/", cn:"观光", s:"We went sightseeing in Harbin.", tag:"外出"},
+  {w:"ticket", pho:"/ˈtɪkɪt/", cn:"票", s:"Show your ticket at the gate.", tag:"外出"},
+  {w:"freezing", pho:"/ˈfriːzɪŋ/", cn:"冷得要命", s:"It's freezing outside today!", tag:"外出"},
+  {w:"amazing", pho:"/əˈmeɪzɪŋ/", cn:"令人惊叹的", s:"The ice castle is amazing!", tag:"外出"},
+  {w:"let's go", pho:"/lets ɡəʊ/", cn:"我们走吧", s:"Grab your coat, let's go!", tag:"外出"},
+  // —— 形容描述 ——
+  {w:"huge", pho:"/hjuːdʒ/", cn:"巨大的", s:"That snowman is huge!", tag:"描述"},
+  {w:"tiny", pho:"/ˈtaɪni/", cn:"极小的", s:"A tiny kitten slept there.", tag:"描述"},
+  {w:"cozy", pho:"/ˈkəʊzi/", cn:"温暖舒适的", s:"This blanket is so cozy.", tag:"描述"},
+  {w:"sparkling", pho:"/ˈspɑːklɪŋ/", cn:"闪闪发光的", s:"The lake is sparkling in the sun.", tag:"描述"},
+  {w:"brand new", pho:"/brænd njuː/", cn:"全新的", s:"I got a brand new bike!", tag:"描述"},
+  // —— 时间频率 ——
+  {w:"every day", pho:"/ˈevri deɪ/", cn:"每天", s:"I practice English every day.", tag:"时间"},
+  {w:"right now", pho:"/raɪt naʊ/", cn:"立刻、现在", s:"Do it right now, not later.", tag:"时间"},
+  {w:"later", pho:"/ˈleɪtə/", cn:"稍后", s:"I'll clean it later, okay?", tag:"时间"},
+  {w:"finally", pho:"/ˈfaɪnəli/", cn:"终于", s:"Finally, the weekend is here!", tag:"时间"},
+  {w:"already", pho:"/ɔːlˈredi/", cn:"已经", s:"I already ate breakfast.", tag:"时间"},
+  // —— 请求与回应 ——
+  {w:"May I...", pho:"/meɪ aɪ/", cn:"我可以……吗？", s:"May I have a cookie, please?", tag:"请求"},
+  {w:"Sure thing", pho:"/ʃɜː θɪŋ/", cn:"当然可以", s:"Sure thing, here you go.", tag:"请求"},
+  {w:"hold on", pho:"/həʊld ɒn/", cn:"等一下", s:"Hold on, I'm almost done.", tag:"请求"},
+  {w:"here you go", pho:"/hɪə jʊ ɡəʊ/", cn:"给你", s:"Here you go, one ice cream.", tag:"请求"},
+  {w:"thank you so much", pho:"/θæŋk jʊ səʊ mʌtʃ/", cn:"非常感谢", s:"Thank you so much for helping!", tag:"请求"},
+];
+
+const BANKS = {
+  susan: {name:"🥇 第一桶金 Susan100词", data:SUSAN_BANK},
+  noun: {name:"⭐ 超级名词卡", data:NOUN_BANK},
+  phrase: {name:"💬 场景表达卡", data:PHRASE_BANK},
+  custom: {name:"📌 我的词卡"}
+};
+
+/* 当前词库（我的词卡 = 家长自定义） */
+function bank(){
+  store.custom = store.custom || [];
+  return deck==="custom" ? store.custom : BANKS[deck].data;
+}
+
+/* 名词卡配图（Emoji 版，离线可用） */
+const EMOJI = {
+  "elephant":"🐘","penguin":"🐧","squirrel":"🐿️","dolphin":"🐬","butterfly":"🦋","rabbit":"🐰","lion":"🦁","giraffe":"🦒",
+  "cookie":"🍪","noodles":"🍜","dumplings":"🥟","yogurt":"🥣","strawberry":"🍓","sandwich":"🥪","egg":"🥚","milk":"🥛",
+  "pencil":"✏️","eraser":"🧽","notebook":"📓","classroom":"🏫","library":"📚","scissors":"✂️",
+  "elbow":"💪","shoulder":"🤷","stomach":"🤰","knee":"🦵","chin":"🤔","finger":"☝️",
+  "pillow":"🛏️","curtain":"🪟","sofa":"🛋️","mirror":"🪞","refrigerator":"🧊","lamp":"💡",
+  "subway":"🚇","helicopter":"🚁","scooter":"🛴","truck":"🚚","airplane":"✈️",
+  "sweater":"🧶","scarf":"🧣","gloves":"🧤","boots":"🥾","raincoat":"🌧️",
+  "rainbow":"🌈","thunder":"🌩️","snowflake":"❄️","sunshine":"☀️",
+  "playground":"🛝","hospital":"🏥","supermarket":"🏪","museum":"🏛️","beach":"🏖️",
+  "umbrella":"☂️","balloon":"🎈","toothbrush":"🪥",
+  // —— 第一桶金 Susan100词 ——
+  "chick":"🐤","duck":"🦆","tiger":"🐯","monkey":"🐵","panda":"🐼","pig":"🐷","sheep":"🐑",
+  "dog":"🐶","deer":"🦌","cat":"🐱","fox":"🦊","hen":"🐔","horse":"🐴","donkey":"🫏","bull":"🐂",
+  "gorilla":"🦍","owl":"🦉","cow":"🐄","apple":"🍎","orange":"🍊","watermelon":"🍉","grape":"🍇",
+  "banana":"🍌","pear":"🍐","coconut":"🥥","vegetable":"🥬","carrot":"🥕","tomato":"🍅","pea":"🫛",
+  "potato":"🥔","fish":"🐟","hamburger":"🍔","candy":"🍬","juice":"🧃",
+  "mom":"👩","dad":"👨","grandma":"👵","grandpa":"👴","girl":"👧","boy":"👦","baby":"👶","robot":"🤖",
+  "heart":"❤️","mouth":"👄","hand":"✋","foot":"🦶","leg":"🦵","arm":"💪",
+  "building":"🏢","bed":"🛏️","desk":"🪑","table":"🍽️","door":"🚪","window":"🪟","piano":"🎹","TV":"📺",
+  "freezer":"🧊","newspaper":"📰","envelope":"✉️","book":"📖","ink":"🖋️","cup":"🥤","lock":"🔒","key":"🔑",
+  "hammer":"🔨","clock":"🕰️","jacket":"🧥","jeans":"👖","dress":"👗","vest":"🦺","T-shirt":"👕",
+  "sock":"🧦","hat":"👒","cap":"🧢","glasses":"👓","sunglasses":"🕶️","watch":"⌚",
+  "car":"🚗","bus":"🚌","van":"🚐","traffic light":"🚥","boat":"⛵","sea":"🌊",
+  "sun":"☀️","moon":"🌙","flower":"🌸","grass":"🌿","spring":"🌱","summer":"🏖️","autumn":"🍂","winter":"⛄"
+};
+
+/* ================= 状态 ================= */
+const KEY = "susan_word_game_v1";
+const DAILY_GOAL = 8;
+let store = load();
+let quiz = null;
+let deck = store.deck && BANKS[store.deck] ? store.deck : "susan";
+// 一次性迁移：跟随课堂进度，默认切到第一桶金
+if(!store.deckV2){
+  deck = "susan"; store.deck = "susan"; store.deckV2 = true;
+  store.range = store.range || "all";
+  save();
+}
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(KEY)) || fresh(); }
+  catch(e){ return fresh(); }
+}
+function fresh(){ return {days:{}, stars:0, runs:0, todayKey:null, todayCount:0, deck:"susan", custom:[], range:"all", deckV2:true}; }
+function save(){ localStorage.setItem(KEY, JSON.stringify(store)); }
+function todayKey(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function dayDiff(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+
+/* ================= 首页渲染 ================= */
+function renderHome(){
+  const tk = todayKey();
+  // 重置今日计数（换了新的一天）
+  if(store.todayKey !== tk){ store.todayKey = tk; store.todayCount = 0; save(); }
+  // 连续天数
+  let streak = 0, d = new Date();
+  // 今天还没打卡时，从昨天开始算
+  if(!store.days[tk]) d.setDate(d.getDate()-1);
+  while(store.days[fmt(d)]){ streak++; d.setDate(d.getDate()-1); }
+  document.getElementById("streakNum").textContent = streak;
+  document.getElementById("totalStars").textContent = store.stars;
+  document.getElementById("totalRuns").textContent = store.runs;
+  const pct = Math.min(100, Math.round(store.todayCount/DAILY_GOAL*100));
+  document.getElementById("todayBar").style.width = pct+"%";
+  document.getElementById("todayTask").textContent =
+    store.todayCount >= DAILY_GOAL ? "✅ 今日打卡完成，明天见！" : `今日目标：完成 ${DAILY_GOAL} 题（${store.todayCount}/${DAILY_GOAL}）`;
+  renderCalendar(streak);
+  renderWordBank();
+  renderCustomList();
+}
+function fmt(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+function renderCalendar(streak){
+  const cal = document.getElementById("calendar");
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  document.getElementById("monthLabel").textContent = `${y}年${m+1}月`;
+  const first = new Date(y,m,1);
+  const offset = (first.getDay()+6)%7; // 周一开头
+  const daysIn = new Date(y,m+1,0).getDate();
+  const wds = ["一","二","三","四","五","六","日"];
+  let html = wds.map(w=>`<div class="wd">${w}</div>`).join("");
+  for(let i=0;i<offset;i++) html += `<div></div>`;
+  for(let i=1;i<=daysIn;i++){
+    const key = `${y}-${String(m+1).padStart(2,"0")}-${String(i).padStart(2,"0")}`;
+    const cls = ["d"];
+    if(store.days[key]) cls.push("done");
+    if(i===now.getDate()) cls.push("today");
+    if(i>now.getDate()) cls.push("future");
+    html += `<div class="${cls.join(" ")}">${i}</div>`;
+  }
+  cal.innerHTML = html;
+}
+
+function renderWordBank(){
+  const box = document.getElementById("wordBank");
+  document.getElementById("bankLabel").textContent = BANKS[deck].name;
+  box.innerHTML = bank().map((it,i)=>
+    `<button style="border:2px solid #ffe3ee;background:#fff;border-radius:12px;padding:6px 12px;cursor:pointer;font-family:inherit;font-size:14px;color:var(--text)"
+      onclick="speak('${it.w.replace(/'/g,"\\'")}'); this.style.borderColor='var(--pink)'"
+      title="${it.cn} · ${it.pho||""}">${EMOJI[it.w] ? EMOJI[it.w]+" " : (deck==="custom" ? "🌟 " : "")}${it.w}</button>`).join("");
+}
+
+function switchDeck(name){
+  deck = name; store.deck = name; save();
+  renderWordBank();
+  renderDeckBtns();
+  showToast("已切换到：" + BANKS[name].name);
+}
+function renderDeckBtns(){
+  document.getElementById("deckSusan").className = "deck-btn" + (deck==="susan" ? " on" : "");
+  document.getElementById("deckNoun").className = "deck-btn" + (deck==="noun" ? " on" : "");
+  document.getElementById("deckPhrase").className = "deck-btn" + (deck==="phrase" ? " on" : "");
+  document.getElementById("deckCustom").className = "deck-btn" + (deck==="custom" ? " on" : "");
+  const row = document.getElementById("rangeRow");
+  row.style.display = deck==="susan" ? "flex" : "none";
+  if(deck==="susan") renderRange();
+}
+function renderRange(){
+  store.range = store.range || "all";
+  document.querySelectorAll(".rng-btn").forEach(b=>{
+    const val = b.getAttribute("onclick").match(/'([^']+)'/)[1];
+    b.className = "rng-btn" + (store.range===val ? " on" : "");
+  });
+}
+function setRange(r){
+  store.range = r; save(); renderRange();
+  const label = r==="all" ? "全部100词" : "第"+r.replace("-","~")+"词";
+  showToast("打卡范围：" + label);
+}
+
+/* ================= 家长词库管理 ================= */
+function renderCustomList(){
+  store.custom = store.custom || [];
+  document.getElementById("customCount").textContent = store.custom.length ? `已存 ${store.custom.length} 个词` : "";
+  document.getElementById("customList").innerHTML = store.custom.map((it,i)=>
+    `<span class="cw-tag">${EMOJI[it.w]||"🌟"} ${it.w} <small style="color:var(--muted)">${it.cn}</small><button onclick="delCustom(${i})" title="删除">✕</button></span>`).join("");
+}
+function addCustom(){
+  const w = document.getElementById("cwWord").value.trim();
+  const cn = document.getElementById("cwCn").value.trim();
+  const s  = document.getElementById("cwS").value.trim();
+  if(!w || !cn){ showToast("单词和中文意思都要填哦"); return; }
+  store.custom = store.custom || [];
+  if(store.custom.some(x=>x.w.toLowerCase()===w.toLowerCase())){ showToast(`"${w}" 已经在词库里啦`); return; }
+  store.custom.push({w, pho:"", cn, s: s || `Look! It's ${/^[aeiou]/i.test(w)?"an":"a"} ${w} !`, tag:"自定义"});
+  save();
+  document.getElementById("cwWord").value = "";
+  document.getElementById("cwCn").value = "";
+  document.getElementById("cwS").value = "";
+  renderCustomList();
+  document.getElementById("cwWord").focus();
+  showToast(`已添加 🌟 ${w}`);
+}
+function delCustom(i){
+  store.custom.splice(i,1);
+  save();
+  renderCustomList();
+}
+function toggleImport(){
+  const box = document.getElementById("cwBatch");
+  const btn = document.getElementById("cwImportBtn");
+  const on = box.style.display !== "none";
+  box.style.display = on ? "none" : "block";
+  btn.style.display = on ? "none" : "inline-block";
+}
+function importBatch(){
+  const raw = document.getElementById("cwBatch").value.trim();
+  if(!raw){ showToast("先粘贴单词列表"); return; }
+  store.custom = store.custom || [];
+  let added = 0, skipped = 0;
+  raw.split("\n").forEach(line=>{
+    const parts = line.split("|").map(x=>x.trim()).filter(Boolean);
+    let w, cn, s;
+    if(parts.length >= 2){ w=parts[0]; cn=parts[1]; s=parts[2]||""; }
+    else{
+      const t = line.trim().split(/\s+/);
+      if(t.length < 2) return;
+      w = t[0]; cn = t.slice(1).join(" ");
+    }
+    if(!w || !cn) return;
+    if(store.custom.some(x=>x.w.toLowerCase()===w.toLowerCase())){ skipped++; return; }
+    store.custom.push({w, pho:"", cn, s: s || `Look! It's ${/^[aeiou]/i.test(w)?"an":"a"} ${w} !`, tag:"自定义"});
+    added++;
+  });
+  save();
+  renderCustomList();
+  document.getElementById("cwBatch").value = "";
+  toggleImport();
+  showToast(added ? `导入成功 ${added} 个词${skipped?`，跳过重复 ${skipped} 个`:''}` : "没有读到有效的单词，检查一下格式");
+}
+
+/* ================= 进度存档（跨设备迁移） ================= */
+function toggleSaveBox(){
+  const box = document.getElementById("saveBox");
+  const btn = document.getElementById("saveImportBtn");
+  const on = box.style.display !== "none";
+  box.style.display = on ? "none" : "block";
+  btn.style.display = on ? "none" : "inline-block";
+}
+function exportSave(){
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(store))));
+  const box = document.getElementById("saveBox");
+  box.style.display = "block";
+  document.getElementById("saveImportBtn").style.display = "inline-block";
+  box.value = code;
+  box.select();
+  try{ document.execCommand("copy"); showToast("存档码已复制，微信发给自己即可"); }
+  catch(e){ showToast("已生成存档码，请手动复制"); }
+}
+function importSave(){
+  const raw = document.getElementById("saveBox").value.trim();
+  if(!raw){ showToast("先粘贴存档码"); return; }
+  try{
+    const data = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if(!data.days || !("stars" in data)) throw new Error("bad");
+    data.custom = data.custom || [];
+    data.range = data.range || "all";
+    data.deckV2 = true;
+    store = data;
+    deck = BANKS[store.deck] ? store.deck : "susan";
+    save();
+    toggleSaveBox();
+    renderHome(); renderDeckBtns();
+    showToast("✅ 存档恢复成功，打卡记录都回来了");
+  }catch(e){ showToast("存档码无效，检查是否复制完整"); }
+}
+
+/* ================= 发音 ================= */
+function speak(text){
+  try{
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US"; u.rate = 0.85;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }catch(e){ showToast("当前设备不支持发音"); }
+}
+
+/* ================= 出题 ================= */
+function shuffle(a){ return a.sort(()=>Math.random()-0.5); }
+/* 按老师进度分段（第一桶金 1-100 词） */
+function rangeBank(){
+  let b = bank();
+  if(deck==="susan" && store.range && store.range!=="all"){
+    const parts = store.range.split("-");
+    const a = Number(parts[0]), z = Number(parts[1]);
+    b = b.filter(x=>x.n>=a && x.n<=z);
+  }
+  return b;
+}
+function pick(n){ return shuffle([...rangeBank()]).slice(0,n); }
+
+function startQuiz(mode){
+  const conf = {
+    recognize:{n:8, label:"看单词，选意思"},
+    listen:   {n:8, label:"听发音，选单词"},
+    spell:    {n:6, label:"听意思，拼单词"},
+    sentence: {n:6, label:"选词补全句型"},
+    picture:  {n:8, label:"看图片，选单词"},
+  }[mode];
+  if(mode==="picture" && deck==="phrase"){
+    deck = "noun"; store.deck = "noun"; save();
+    renderWordBank(); renderDeckBtns();
+    showToast("看图选词需要带图的词卡，已帮你切换 🃏");
+  }
+  // 看图选词只出配了图的词
+  const list = mode==="picture"
+    ? shuffle(rangeBank().filter(x=>EMOJI[x.w])).slice(0, conf.n)
+    : pick(conf.n);
+  if(!list.length){
+    showToast(deck==="custom" ? "「我的词卡」还是空的，先在上面添加单词吧 ✏️" : "词库暂时为空");
+    return;
+  }
+  quiz = {mode, list, idx:0, score:0, label:conf.label, results:[]};
+  show("quiz");
+  renderQuestion();
+}
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo(0,0);
+}
+
+function renderQuestion(){
+  const q = quiz.list[quiz.idx];
+  const numTag = (deck==="susan" && q.n) ? ` · 名词卡第${q.n}词` : "";
+  document.getElementById("dots").innerHTML = quiz.list.map((_,i)=>
+    `<div class="dot ${i<quiz.idx ? (quiz.results[i]?"ok":"bad") : ""}"></div>`).join("");
+  document.getElementById("spellArea").style.display = "none";
+  document.getElementById("optArea").style.display = "grid";
+
+  const card = document.getElementById("qCard");
+  const opts = document.getElementById("optArea");
+
+  if(quiz.mode==="recognize"){
+    card.innerHTML = `<div class="q-label">第 ${quiz.idx+1} 题${numTag} ·这个单词是什么意思？</div>
+      <div class="q-word">${q.w}</div><div class="q-pho">${q.pho}</div>
+      <button class="speak-btn" onclick="speak('${q.w.replace(/'/g,"\\'")}')">🔊 再听一遍</button>`;
+    opts.innerHTML = shuffle([q, ...distract(q)]).map((o,i)=>
+      `<button class="opt" onclick="answer(this, ${o.w===q.w})">${o.cn}</button>`).join("");
+  }
+  else if(quiz.mode==="listen"){
+    card.innerHTML = `<div class="q-label">第 ${quiz.idx+1} 题${numTag} ·听发音，选出单词</div>
+      <button class="speak-btn" style="font-size:18px;padding:12px 26px" onclick="speak('${q.w.replace(/'/g,"\\'")}')">🔊 点我听发音</button>
+      <div class="sentence" style="margin-top:16px">提示意思：${q.cn}</div>`;
+    opts.innerHTML = shuffle([q, ...distract(q)]).map(o=>
+      `<button class="opt" onclick="answer(this, ${o.w===q.w})">${o.w}</button>`).join("");
+    setTimeout(()=>speak(q.w), 300);
+  }
+  else if(quiz.mode==="spell"){
+    card.innerHTML = `<div class="q-label">第 ${quiz.idx+1} 题${numTag} ·拼出这个单词</div>
+      <div class="q-word" style="font-size:22px">${q.cn}</div><div class="q-pho">${q.pho}</div>
+      <div class="sentence">🔊 <b>点击听发音</b>，再照着拼出来：<button class="speak-btn" style="margin-top:8px" onclick="speak('${q.w.replace(/'/g,"\\'")}')">🔊 发音</button></div>`;
+    opts.innerHTML = "";
+    document.getElementById("optArea").style.display = "none";
+    document.getElementById("spellArea").style.display = "block";
+    const inp = document.getElementById("spellInput");
+    inp.value = ""; inp.disabled = false;
+    setTimeout(()=>speak(q.w), 300);
+    setTimeout(()=>inp.focus(), 400);
+  }
+  else if(quiz.mode==="sentence"){
+    // 把例句中目标词挖空，选正确短语/词
+    const target = q.w;
+    const blanked = q.s.replace(new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"), "i"),
+      `<span style="color:var(--pink);font-weight:700">_____</span>`);
+    card.innerHTML = `<div class="q-label">第 ${quiz.idx+1} 题${numTag} ·补全 Susan 句型</div>
+      <div class="sentence" style="font-size:16px">${blanked}</div>
+      <div class="q-pho" style="margin-top:8px">句意：${q.cn} 出现在句子里，选哪张卡片？</div>`;
+    opts.innerHTML = shuffle([q, ...distract(q)]).map(o=>
+      `<button class="opt" style="font-size:15px" onclick="answer(this, ${o.w===q.w})">${o.w}</button>`).join("");
+  }
+  else if(quiz.mode==="picture"){
+    const em = EMOJI[q.w] || "❓";
+    card.innerHTML = `<div class="q-label">第 ${quiz.idx+1} 题${numTag} ·这是什么？选出对应的单词</div>
+      <div style="font-size:96px; line-height:1.2; margin:8px 0">${em}</div>
+      <button class="speak-btn" onclick="speak('${q.w.replace(/'/g,"\\'")}')">🔊 听提示</button>`;
+    opts.innerHTML = shuffle([q, ...distract(q)]).map(o=>
+      `<button class="opt" onclick="answer(this, ${o.w===q.w})">${o.w}</button>`).join("");
+  }
+}
+
+function distract(q){
+  let pool = bank().filter(x=>x.w!==q.w);
+  if(pool.length < 3) pool = pool.concat(NOUN_BANK.filter(x=>x.w!==q.w));
+  return shuffle(pool).slice(0,3);
+}
+
+function answer(btn, correct){
+  const q = quiz.list[quiz.idx];
+  document.querySelectorAll(".opt").forEach(b=>b.disabled=true);
+  if(correct){
+    btn.classList.add("correct");
+    quiz.score++; quiz.results.push(true);
+    store.stars++; showFB(true, q);
+  }else{
+    btn.classList.add("wrong");
+    document.querySelectorAll(".opt").forEach(b=>{
+      if(!b.classList.contains("wrong") && b.textContent=== (quiz.mode==="recognize"? q.cn : q.w)) b.classList.add("correct");
+    });
+    quiz.results.push(false);
+    showFB(false, q);
+  }
+  quiz.idx++;
+  save();
+}
+
+function checkSpell(){
+  const q = quiz.list[quiz.idx];
+  const val = document.getElementById("spellInput").value.trim().toLowerCase();
+  const ok = val === q.w.toLowerCase();
+  document.querySelectorAll(".opt").forEach(b=>b.disabled=true);
+  const inp = document.getElementById("spellInput");
+  inp.disabled = true;
+  inp.style.borderColor = ok ? "var(--green)" : "#ff8787";
+  if(ok){ quiz.score++; quiz.results.push(true); store.stars++; showFB(true,q); }
+  else{ quiz.results.push(false); showFB(false,q); }
+  quiz.idx++;
+  save();
+}
+
+/* ================= 反馈与流程 ================= */
+function showFB(good, q){
+  const fb = document.getElementById("fb");
+  const t = document.getElementById("fbTitle");
+  t.className = "fb-title " + (good?"good":"bad");
+  t.textContent = good ? pickOne(["答对啦！","漂亮！","Perfect!","太厉害了！","You got it!"]) : "再想想哦～";
+  document.getElementById("fbStars").textContent = good ? "⭐ +1" : "💪 加油，下一题！";
+  document.getElementById("fbDetail").innerHTML =
+    `<b>${q.w}</b> — ${q.cn}<br>💬 ${q.s}<br>
+     <button class="speak-btn" style="margin-top:8px" onclick="speak('${q.s.replace(/'/g,"\\'")}')">🔊 听整句</button>`;
+  if(quiz && quiz.mode==="picture") speak(q.w);
+  setTimeout(()=>fb.classList.add("show"), 350);
+}
+function pickOne(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+function nextQuestion(){
+  document.getElementById("fb").classList.remove("show");
+  setTimeout(()=>{
+    if(quiz.idx >= quiz.list.length) finishQuiz();
+    else renderQuestion();
+  }, 250);
+}
+
+function finishQuiz(){
+  const n = quiz.list.length, s = quiz.score;
+  const tk = todayKey();
+  store.todayCount += s;
+  if(store.todayCount >= DAILY_GOAL && !store.days[tk]){
+    store.days[tk] = true;
+    store.stars += 3; // 打卡奖励
+    setTimeout(()=>showToast("📅 打卡成功！奖励 ⭐⭐⭐"), 600);
+  }
+  store.runs++;
+  save();
+  show("result");
+  document.getElementById("resScore").textContent = `${s}/${n}`;
+  const starN = s===n ? 3 : s >= n*0.75 ? 2 : s >= n*0.5 ? 1 : 0;
+  document.getElementById("resStars").textContent = "⭐".repeat(starN) + "☆".repeat(3-starN);
+  document.getElementById("resEmoji").textContent = starN===3 ? "🏆" : starN>=1 ? "🎉" : "💪";
+  document.getElementById("resSub").textContent =
+    starN===3 ? "满分！Susan 会为你骄傲的！" :
+    starN>=1 ? "不错哦，明天继续保持！" : "没关系，再练一轮就熟了！";
+  speak(starN===3 ? "Awesome! You did it!" : "Good job! Keep going!");
+}
+
+function quitQuiz(){
+  document.getElementById("fb").classList.remove("show");
+  quiz = null;
+  renderHome();
+  show("home");
+}
+function goHome(){
+  renderHome();
+  show("home");
+}
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* 拼写题回车提交 */
+document.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && document.getElementById("spellArea").style.display==="block"
+     && !document.getElementById("spellInput").disabled){
+    checkSpell();
+  }
+});
+
+renderHome();
+renderDeckBtns();
+</script>
+</body>
+</html>
